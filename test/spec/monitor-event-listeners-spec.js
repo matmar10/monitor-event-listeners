@@ -20,10 +20,11 @@ describe("Monitor Event Listeners", function() {
         return findVisualizer().find('.' + $.monitorEventListeners.defaults.visualizerNewItemClass);
     }
 
-    it("empty visualizer created", function() {
-        var $visualizer = null,
+    it("visualizer created, count increments on bind, and count decrements on unbind", function() {
+        var $body = $('body'),
+            $visualizer = null,
             $countElement = null;
-        $('body').monitorEventListeners();
+        $body.monitorEventListeners();
         $visualizer = findVisualizer();
         expect($visualizer.length).toEqual(1);
         $countElement = findCountElement($visualizer);
@@ -31,10 +32,6 @@ describe("Monitor Event Listeners", function() {
         expect($countElement.text()).toEqual("total: 0");
         $visalizerItems = findVisualizerItems($visualizer);
         expect($visalizerItems.length).toEqual(0);
-    });
-
-    it("count increments on bind and decrements on unbind", function() {
-        var $body = $('body');
 
         $body.on('click', testCallback);
         expect(findCountElement().text()).toEqual("total: 1");
