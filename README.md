@@ -18,6 +18,9 @@ $('body').monitorEventListeners();
 </script>
 ```
 
+Options
+-------
+
 By default, it's configureded to monitor all calls to $().on and $().off methods; 
 additional methods to listen for can be added by name:
 
@@ -37,7 +40,18 @@ $('body').monitorEventListeners({
     logAddedHeader: "==== LISTENER WAS ADDED ===",
     logAddedFooter: "==========================="
 });
-
-
 ```
+
+The plugin can be destroyed with the following:
+
+```JS
+// the selector here would be whatever you used to initialize the plugin
+$('body').monitorEventListeners('destroy');
+```
+
+Tests
+-----
+
+A minimal set of unit tests are included. To run them, simply open `test/spec-runner.html`
+
 

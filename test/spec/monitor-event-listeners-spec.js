@@ -6,10 +6,7 @@ describe("Monitor Event Listeners", function() {
         };
 
     function findVisualizer() {
-        if(!$visualizer) {
-            $visualizer = $('#' + $.monitorEventListeners.defaults.visualizerId);
-        }
-        return $visualizer;
+        return $('#' + $.monitorEventListeners.defaults.visualizerId);
     }
 
     function findCountElement() {
@@ -21,9 +18,7 @@ describe("Monitor Event Listeners", function() {
     }
 
     it("visualizer created, count increments on bind, and count decrements on unbind", function() {
-        var $body = $('body'),
-            $visualizer = null,
-            $countElement = null;
+        var $body = $('body');
         $body.monitorEventListeners();
         $visualizer = findVisualizer();
         expect($visualizer.length).toEqual(1);
@@ -48,6 +43,10 @@ describe("Monitor Event Listeners", function() {
         $body.off('click', testCallback);
         expect(findCountElement().text()).toEqual("total: 0");
         expect(findVisualizerItems().length).toEqual(0);
+
+        $body.monitorEventListeners('destroy');
+        $visualizer = findVisualizer();
+        expect($visualizer.length).toEqual(0);
     });
 
 });

@@ -10,6 +10,169 @@
         return $element.attr('tagName') + '#' + $element.attr('id') + '.' + $element.attr('class');
     }
 
+    var EventListenerMonitor = function(options) {
+
+        var o = $.extend(true, {}, $.monitorEventListeners.defaults, options), // instance options; true signifies deep-cloning
+            context = this,
+            events = {},
+            originalFunctions = {},
+            totalCount = 0,
+            $visualizer = $('<div></div>')
+                .attr('id', o.visualizerId)
+                .css(o.visualizerCss),
+            $container = $('<div></div>').prependTo($visualizer),
+            $visualizerCount = $('<div></div>')
+                .addClass(o.visualizerCountClass)
+                .css(o.visualizerCountCss)
+                .appendTo($visualizer);
+
+        updateTotalCount();
+
+        function getIdentifier(element) {
+            var $element = $(element),
+                identifier = $element.data('identifier');
+            if(!identifier) {
+                identifier = o.identifier(element);
+                $element.data('identifier', identifier);
+            }
+            return identifier;
+        }
+
+        function addVisualizerItem() {
+            var $newItem = $('<div></div>').addClass(o.visualizerNewItemClass);
+            $newItem.appendTo($container).css(o.visualizerNewItemCss);
+            updateTotalCount();
+        }
+
+        function removeVisualizerItem() {
+            $visualizer.find('.event-listener-item').first().remove();
+            updateTotalCount();
+        }
+
+        function updateTotalCount() {
+            $visualizerCount.text('total: ' + totalCount);
+            refreshColor();
+        }
+
+        function refreshColor() {
+            var getColorProperty = function(red, green) {
+                    return 'rgb(' + red + ', ' + green + ', 0)';
+                },
+                setColorProperty = function(red, green) {
+                    var colorValue = getColorProperty(red, green);
+                    $visualizer.find('.' + o.visualizerNewItemClass)
+                        .css({
+                            "background-color": colorValue
+                        });
+                };
+
+            if(totalCount <= 50) {
+                setColorProperty(0, 255 - (totalCount * 2));
+                return;
+            }
+
+            if(totalCount <= 205) {
+                setColorProperty(totalCount + 50, 0);
+                return;
+            }
+
+            setColorProperty(255, 0);
+        }
+
+        function logListenerCreated(element, event) {
+            o.log(o.logAddedHeader);
+            var identifier = getIdentifier(element);
+            events[identifier] = events[identifier] || {};
+            events[identifier][event] = events[identifier][event] || 0;
+            events[identifier][event]++;
+            totalCount++;
+            addVisualizerItem();
+            o.log(identifier + " >> " + event + " BOUND (total: " + events[identifier][event] + ")");
+            o.log(o.logAddedFooter);
+        }
+
+        function logListenerDestroyed(element, event) {
+            var identifier = getIdentifier(element);
+            events[identifier] = events[identifier] || {};
+            events[identifier][event] = events[identifier][event] || 0;
+            events[identifier][event]--;
+            totalCount--;
+            removeVisualizerItem();
+            o.log(o.logRemovedHeader);
+            o.log(identifier + " >> " + event + " UNBOUND (total: " + events[identifier][event] + ")");
+            o.log(o.logRemovedFooter);
+        }
+
+        /**
+         * Gets the visualizer element
+         *
+         * @returns jQuery,Zepto Returns the visualizer element associated with this monitor instance
+         */
+        this.visualizer = function () {
+            return $visualizer;
+        };
+
+        /**
+         * Gets the options
+         *
+         * @returns object Returns the instance options object
+         */
+        this.options = function () {
+            return o;
+        };
+
+        /**
+         * Initializes the event binding/unbinding proxyy functions
+         */
+        this.initializeBindingProxies = function () {
+
+            if('string' === $.type(o.bind)) {
+                o.bind = [o.bind];
+            }
+
+            $.each(o.bind, function(i, bindFunctionName) {
+                var newBind = function() {
+                        logListenerCreated(this, arguments[0]);
+                    originalFunctions[bindFunctionName].apply(this, arguments);
+                    };
+                eval('originalFunctions[bindFunctionName] = ' + bindFunctionName + ';');
+                eval(bindFunctionName + ' = newBind;');
+            });
+
+            if('string' === $.type(o.unbind)) {
+                o.unbind = [o.unbind];
+            }
+
+            $.each(o.unbind, function(i, unbindFunctionName) {
+                var newUnbind = function() {
+                        logListenerDestroyed(this, arguments[0]);
+                        originalFunctions[unbindFunctionName].apply(this, arguments);
+                    };
+                eval('originalFunctions[unbindFunctionName] = ' + unbindFunctionName + ';');
+                eval(unbindFunctionName + ' = newUnbind;');
+            });
+        };
+
+        /**
+         * Reverts proxies to the original functions
+         */
+        this.revertBindingProxies = function () {
+            $.each(originalFunctions, function(functionName, originalFunction) {
+                eval(functionName + ' = originalFunction;');
+            });
+        };
+
+        /**
+         * Cleans up the listener
+         */
+        this.destroy = function () {
+            context.revertBindingProxies();
+            $visualizer.remove();
+        };
+
+        this.initializeBindingProxies();
+    };
+
     $.monitorEventListeners = {
 
         defaults: {
@@ -63,127 +226,26 @@
          * Creates a new profiler and attaches a visualizer to the set of matched elements
          *
          * @param options object Optional options to override the defaults
-         * @return Zepto The matched elements
+         * @return jQuery,Zepto The matched elements
          */
-        monitorEventListeners: function(options) {
+        monitorEventListeners: function (options) {
 
-            var o = $.extend(true, {}, $.monitorEventListeners.defaults, options), // instance options; true signifies deep-cloning
-                events = {},
-                totalCount = 0,
-                $visualizer = $('<div></div>')
-                    .attr('id', o.visualizerId)
-                    .css(o.visualizerCss),
-                $container = $('<div></div>').prependTo($visualizer),
-                $visualizerCount = $('<div></div>')
-                    .addClass(o.visualizerCountClass)
-                    .css(o.visualizerCountCss)
-                    .appendTo($visualizer);
+            var instance = null,
+                $visualizer = null;
 
-            updateTotalCount();
-
-            function getIdentifier(element) {
-                var $element = $(element),
-                    identifier = $element.data('identifier');
-                if(!identifier) {
-                    identifier = o.identifier(element);
-                    $element.data('identifier', identifier);
+            if('string' === $.type(options)) {
+                if('destroy' === options) {
+                    instance = $(this).get(0).monitorEventListener;
+                    instance.destroy();
                 }
-                return identifier;
+                return this;
             }
 
-            function addVisualizerItem() {
-                var $newItem = $('<div></div>').addClass(o.visualizerNewItemClass);
-                $newItem.appendTo($container).css(o.visualizerNewItemCss);
-                updateTotalCount();
-            }
 
-            function removeVisualizerItem() {
-                $visualizer.find('.event-listener-item').first().remove();
-                updateTotalCount();
-            }
-
-            function updateTotalCount() {
-                $visualizerCount.text('total: ' + totalCount);
-                refreshColor();
-            }
-
-            function refreshColor() {
-                var getColorProperty = function(red, green) {
-                        return 'rgb(' + red + ', ' + green + ', 0)';
-                    },
-                    setColorProperty = function(red, green) {
-                        var colorValue = getColorProperty(red, green);
-                        $visualizer.find('.' + o.visualizerNewItemClass)
-                            .css({
-                                "background-color": colorValue
-                            });
-                    };
-
-                if(totalCount <= 50) {
-                    setColorProperty(0, 255 - (totalCount * 2));
-                    return;
-                }
-
-                if(totalCount <= 205) {
-                    setColorProperty(totalCount + 50, 0);
-                    return;
-                }
-
-                setColorProperty(255, 0);
-            }
-
-            function logListenerCreated(element, event) {
-                o.log(o.logAddedHeader);
-                var identifier = getIdentifier(element);
-                events[identifier] = events[identifier] || {};
-                events[identifier][event] = events[identifier][event] || 0;
-                events[identifier][event]++;
-                totalCount++;
-                addVisualizerItem();
-                o.log(identifier + " >> " + event + " BOUND (total: " + events[identifier][event] + ")");
-                o.log(o.logAddedFooter);
-            }
-
-            function logListenerDestroyed(element, event) {
-                var identifier = getIdentifier(element);
-                events[identifier] = events[identifier] || {};
-                events[identifier][event] = events[identifier][event] || 0;
-                events[identifier][event]--;
-                totalCount--;
-                removeVisualizerItem();
-                o.log(o.logRemovedHeader);
-                o.log(identifier + " >> " + event + " UNBOUND (total: " + events[identifier][event] + ")");
-                o.log(o.logRemovedFooter);
-            }
-
-            if('string' === $.type(o.bind)) {
-                o.bind = [o.bind];
-            }
-
-            $.each(o.bind, function(i, bindFunctionName) {
-                var originalBind = null,
-                    newBind = function() {
-                        logListenerCreated(this, arguments[0]);
-                        originalBind.apply(this, arguments);
-                    };
-                eval('originalBind = ' + bindFunctionName + ';');
-                eval(bindFunctionName + ' = newBind;');
-            });
-
-            if('string' === $.type(o.unbind)) {
-                o.unbind = [o.unbind];
-            }
-
-            $.each(o.unbind, function(i, unbindFunctionName) {
-                var originalUnbind = null,
-                    newUnbind = function() {
-                        logListenerDestroyed(this, arguments[0]);
-                        originalUnbind.apply(this, arguments);
-                    };
-                eval('originalUnbind = ' + unbindFunctionName + ';');
-                eval(unbindFunctionName + ' = newUnbind;');
-            });
-
+            // create a new instance and visualizer
+            instance = new EventListenerMonitor(options);
+            $visualizer = instance.visualizer();
+            $(this).get(0).monitorEventListener = instance;
             return $(this).append($visualizer);
         }
     });
