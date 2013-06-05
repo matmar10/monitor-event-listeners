@@ -161,6 +161,10 @@
                 }
                 events[identifier][eventName] = count;
             });
+
+            //o.log(o.logRemovedHeader);
+
+            //o.log(o.logRemovedFooter);
         }
 
         /**
@@ -232,10 +236,6 @@
             $visualizer.remove();
         };
 
-        if(!Hammer) {
-            o.ignoreEvents = [];
-        }
-
         this.initializeBindingProxies();
     };
 
@@ -288,12 +288,14 @@
             },
 
             log: function(message) {
-                if(window.console.debug) {
-                    window.console.debug(message);
-                    return;
-                }
-                window.console.log(message);
-            }
+                window.console.debug(message);
+            },
+
+            logAddedHeader: "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++",
+            logAddedFooter: "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++",
+            logRemovedHeader: "------------------------------------------------------------------------------------",
+            logRemovedFooter: "------------------------------------------------------------------------------------"
+
         }
     };
 
@@ -327,4 +329,4 @@
         }
     });
 
-})(Zepto || jQuery);
+})(Zepto);
