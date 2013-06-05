@@ -1,17 +1,17 @@
 describe("Zepto Hammer Event Listener Monitoring", function() {
 
-    var $body = $('body'),
-        $button = null,
+    var $button = null,
         clicks = 0;
 
     beforeEach(function () {
+        var $body = $('body');
         $body.monitorEventListeners();
-        $button = $('<a class="btn btn-primary" href="#test_link">Test Link</a>').appendTo($body);
+        $button = $('<a id="test_link" class="btn btn-primary" href="#test_link">Test Link</a>').appendTo($body);
         clicks = 0;
     });
 
     afterEach(function() {
-        $body.monitorEventListeners('destroy');
+        $('body').monitorEventListeners('destroy');
         $button.remove();
     });
 
@@ -20,11 +20,11 @@ describe("Zepto Hammer Event Listener Monitoring", function() {
             clicks++;
         };
 
-        expect($body.find('#event_listener_bindings_visualizer .count').text()).toEqual("total: 0");
+        expect($('body').find('#event_listener_bindings_visualizer .count').text()).toEqual("total: 0");
 
         $button.hammer().on('tap', callback);
 
-        expect($body.find('#event_listener_bindings_visualizer .count').text()).toEqual("total: 1");
+        expect($('body').find('#event_listener_bindings_visualizer .count').text()).toEqual("total: 1");
 
         $button.trigger('tap');
         $button.trigger('tap');
@@ -34,7 +34,7 @@ describe("Zepto Hammer Event Listener Monitoring", function() {
 
         $button.hammer().off('tap', callback);
 
-        expect($body.find('#event_listener_bindings_visualizer .count').text()).toEqual("total: 0");
+        expect($('body').find('#event_listener_bindings_visualizer .count').text()).toEqual("total: 0");
 
         // tap should now be unbound
         $button.trigger('tap');
