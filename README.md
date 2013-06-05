@@ -21,7 +21,7 @@ $('body').monitorEventListeners();
 Options
 -------
 
-By default, it's configureded to monitor all calls to $().on and $().off methods; 
+By default, it's configured to monitor all calls to $().on and $().off methods;
 additional methods to listen for can be added by name:
 
 ```HTML
@@ -37,8 +37,10 @@ All options can be customized. Defaults are listed in `$.monitorEventListeners.d
 
 ```JS
 $('body').monitorEventListeners({
-    logAddedHeader: "==== LISTENER WAS ADDED ===",
-    logAddedFooter: "==========================="
+    log: function(message) {
+        window.console.debug("$.monitorEventListeners says: ");
+        window.console.debug(message);
+    },
 });
 ```
 
