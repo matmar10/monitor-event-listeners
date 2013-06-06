@@ -52,6 +52,7 @@
             context = this,
             events = {},
             originalFunctions = {},
+            eventListenerCallbacks = {},
             totalCount = 0,
             $visualizer = $('<div></div>')
                 .attr('id', o.visualizerId)
@@ -80,8 +81,8 @@
             updateTotalCount();
         }
 
-        function removeVisualizerItem() {
-            $visualizer.find('.event-listener-item').first().remove();
+        function removeVisualizerItems(numberItems) {
+            $visualizer.find('.event-listener-item').slice(0, numberItems).remove();
             updateTotalCount();
         }
 
@@ -115,11 +116,19 @@
             setColorProperty(255, 0);
         }
 
-        function logListenerCreated(element, event) {
+        function logListenerCreated(element, event, callback) {
             var eventList = event.split(' '),
                 identifier = getIdentifier(element);
 
+            // easy way to compare referential equality of the callback
+            if(!callback.prototype.monitorEventListenerIdentifier) {
+                var id = (new Date).getTime();
+                window.console.log("assigning ID: " + id);
+                callback.prototype.monitorEventListenerIdentifier = id;
+            }
+
             events[identifier] = events[identifier] || {};
+            eventListenerCallbacks[identifier] = eventListenerCallbacks[identifier] || {};
 
             $.each(eventList, function(i, eventName) {
                 var previousCount = events[identifier][eventName] || 0,
@@ -129,37 +138,86 @@
                     return; // continue looping but ignore this event
                 }
 
+                eventListenerCallbacks[identifier][eventName] = eventListenerCallbacks[identifier][eventName] || [];
+                eventListenerCallbacks[identifier][eventName].push(callback);
                 count++;
                 totalCount++;
                 addVisualizerItem();
-                o.log(identifier + " >> " + eventName + " (was: " + previousCount + ", now: " + count + ") BOUND");
                 events[identifier][eventName] = count;
+                o.log(identifier + " >> " + eventName + " (was: " + previousCount + ", now: " + count + ") BOUND");
             });
         }
 
-        function logListenerDestroyed(element, event) {
+        function logListenerDestroyed(element, event, callback) {
             var eventList = event.split(' '),
                 identifier = getIdentifier(element);
 
+            // easy way to compare referential equality of the callback
+            if(callback) {
+                if(!callback.prototype.monitorEventListenerIdentifier) {
+                    callback.prototype.monitorEventListenerIdentifier = (new Date).getTime();
+                }
+            }
+
             events[identifier] = events[identifier] || {};
+            eventListenerCallbacks[identifier] = eventListenerCallbacks[identifier] || {};
 
             $.each(eventList, function(i, eventName) {
                 var previousCount = events[identifier][eventName] || 0,
-                    count = previousCount;
+                    count = previousCount,
+                    callbackIndex = null,
+                    i = null,
+                    removedCount = 0;
 
                 if(~$.inArray(eventName, o.ignoreEvents)) {
                     return; // continue looping but ignore this event
                 }
 
-                if(count > 0) {
-                    count--;
-                    totalCount--;
-                    removeVisualizerItem();
-                    o.log(identifier + " >> " + eventName + " (was: " + previousCount + ", now: " + count + ") UNBOUND");
-                } else {
+                eventListenerCallbacks[identifier][eventName] = eventListenerCallbacks[identifier][eventName] || [];
+
+                if(!count) {
                     o.log(identifier + " >> " + eventName + " (was: 0, now: 0) UNBIND [nothing to unbind]");
+                    events[identifier][eventName] = count;
+                    return;
                 }
+
+                // specific callback being unbound
+                if(callback) {
+                    callbackIndex = $.inArray(callback, eventListenerCallbacks[identifier][eventName]);
+                    // callback was never bound, this unbind will have no effect
+                    if(!~callbackIndex){
+                        o.log(identifier + " >> " + eventName + " (was: " + previousCount + ", now: " + count + ") UNBOUND however provided callback NOT PREVIOUSLY BOUND; no effect");
+                        return; // continue iterating
+                    }
+
+                    // remove all callbacks matching the one passed to the unbind function
+
+                    eventListenerCallbacks[identifier][eventName] = eventListenerCallbacks[identifier][eventName].filter(function(callbackReference) {
+                        if(callback.prototype.monitorEventListenerIdentifier === callbackReference.prototype.monitorEventListenerIdentifier) {
+                            removedCount++;
+                            return false;
+                        }
+                        return true;
+                    });
+
+                    // decrease count by number of matching callbacks
+                    count = count - removedCount;
+                    totalCount = totalCount - removedCount;
+                    removeVisualizerItems(removedCount);
+                    o.log(identifier + " >> " + eventName + " (was: " + previousCount + ", now: " + count + ") UNBOUND");
+
+                    events[identifier][eventName] = count;
+                    return;
+                }
+
+                // remove ALL event listeners of this type for the elements
+
+                totalCount = totalCount - previousCount;
+                count = 0;
+                eventListenerCallbacks[identifier][eventName] = [];
+                removeVisualizerItems(previousCount);
                 events[identifier][eventName] = count;
+                o.log(identifier + " >> " + eventName + " (was: " + previousCount + ", now: " + count + ") UNBOUND");
             });
         }
 
@@ -192,7 +250,7 @@
 
             $.each(o.bind, function(i, bindFunctionName) {
                 var newBind = function() {
-                    logListenerCreated(this, arguments[0]);
+                    logListenerCreated(this, arguments[0], arguments[1]);
                     originalFunctions[bindFunctionName].apply(this, arguments);
                     return this;
                 };
@@ -206,7 +264,7 @@
 
             $.each(o.unbind, function(i, unbindFunctionName) {
                 var newUnbind = function() {
-                    logListenerDestroyed(this, arguments[0]);
+                    logListenerDestroyed(this, arguments[0], arguments[1]);
                     originalFunctions[unbindFunctionName].apply(this, arguments);
                     return this;
                 };
@@ -317,7 +375,6 @@
                 }
                 return this;
             }
-
 
             // create a new instance and visualizer
             instance = new EventListenerMonitor(options);
